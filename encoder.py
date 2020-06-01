@@ -1,14 +1,17 @@
 import time
+import os
 import numpy as np
-import tensorflow as tf
+import tensorflow.compat.v1 as tf
+tf.disable_v2_behavior()
 
 from tqdm import tqdm
-from sklearn.externals import joblib
 
 from utils import HParams, preprocess, iter_data
 
 global nloaded
 nloaded = 0
+
+ROOT_DIR = os.path.dirname(os.path.abspath(__file__))
 
 
 def load_params(shape, dtype, *args, **kwargs):
@@ -36,7 +39,7 @@ def fc(x, nout, act, wn=False, bias=True, scope='fc'):
         z = tf.matmul(x, w)
         if bias:
             b = tf.get_variable("b", [nout], initializer=load_params)
-            z = z+b
+            z = z + b
         h = act(z)
         return h
 
@@ -63,7 +66,7 @@ def mlstm(inputs, c, h, M, ndim, scope='lstm', wn=False):
 
     cs = []
     for idx, x in enumerate(inputs):
-        m = tf.matmul(x, wmx)*tf.matmul(h, wmh)
+        m = tf.matmul(x, wmx) * tf.matmul(h, wmh)
         z = tf.matmul(x, wx) + tf.matmul(m, wh) + b
         i, f, o, u = tf.split(z, 4, 1)
         i = tf.nn.sigmoid(i)
@@ -71,14 +74,14 @@ def mlstm(inputs, c, h, M, ndim, scope='lstm', wn=False):
         o = tf.nn.sigmoid(o)
         u = tf.tanh(u)
         if M is not None:
-            ct = f*c + i*u
-            ht = o*tf.tanh(ct)
+            ct = f * c + i * u
+            ht = o * tf.tanh(ct)
             m = M[:, idx, :]
-            c = ct*m + c*(1-m)
-            h = ht*m + h*(1-m)
+            c = ct * m + c * (1 - m)
+            h = ht * m + h * (1 - m)
         else:
-            c = f*c + i*u
-            h = o*tf.tanh(c)
+            c = f * c + i * u
+            h = o * tf.tanh(c)
         inputs[idx] = h
         cs.append(c)
     cs = tf.stack(cs)
@@ -101,7 +104,7 @@ def model(X, S, M=None, reuse=False):
 
 
 def ceil_round_step(n, step):
-    return int(np.ceil(n/step)*step)
+    return int(np.ceil(n / step) * step)
 
 
 def batch_pad(xs, nbatch, nsteps):
@@ -109,7 +112,7 @@ def batch_pad(xs, nbatch, nsteps):
     mmb = np.ones((nbatch, nsteps, 1), dtype=np.float32)
     for i, x in enumerate(xs):
         l = len(x)
-        npad = nsteps-l
+        npad = nsteps - l
         xmb[i, -l:] = list(x)
         mmb[i, :npad] = 0
     return xmb, mmb
@@ -133,7 +136,7 @@ class Model(object):
             embd_wn=True,
         )
         global params
-        params = [np.load('model/%d.npy'%i) for i in range(15)]
+        params = [np.load(f'{ROOT_DIR}/model/%d.npy' % i) for i in range(15)]
         params[2] = np.concatenate(params[2:6], axis=1)
         params[3:6] = []
 
@@ -162,9 +165,9 @@ class Model(object):
             offset = 0
             n = len(xs)
             smb = np.zeros((2, n, hps.nhidden), dtype=np.float32)
-            for step in range(0, ceil_round_step(maxlen, nsteps), nsteps):
+            for step in tqdm(range(0, ceil_round_step(maxlen, nsteps), nsteps)):
                 start = step
-                end = step+nsteps
+                end = step + nsteps
                 xsubseq = [x[start:end] for x in sorted_xs]
                 ndone = sum([x == b'' for x in xsubseq])
                 offset += ndone
@@ -174,11 +177,11 @@ class Model(object):
                 xmb, mmb = batch_pad(xsubseq, nsubseq, nsteps)
                 for batch in range(0, nsubseq, nbatch):
                     start = batch
-                    end = batch+nbatch
+                    end = batch + nbatch
                     batch_smb = seq_rep(
                         xmb[start:end], mmb[start:end],
-                        smb[:, offset+start:offset+end, :])
-                    smb[:, offset+start:offset+end, :] = batch_smb
+                        smb[:, offset + start:offset + end, :])
+                    smb[:, offset + start:offset + end, :] = batch_smb
             features = smb[0, unsort_idxs, :]
             print('%0.3f seconds to transform %d examples' %
                   (time.time() - tstart, n))
@@ -189,7 +192,7 @@ class Model(object):
             xs = [preprocess(x) for x in xs]
             for xmb in tqdm(
                     iter_data(xs, size=hps.nbatch), ncols=80, leave=False,
-                    total=len(xs)//hps.nbatch):
+                    total=len(xs) // hps.nbatch):
                 smb = np.zeros((2, hps.nbatch, hps.nhidden))
                 n = len(xmb)
                 xmb, mmb = batch_pad(xmb, hps.nbatch, hps.nsteps)

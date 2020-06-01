@@ -5,22 +5,23 @@ import pandas as pd
 import tensorflow as tf
 from sklearn.linear_model import LogisticRegression
 
+
 def train_with_reg_cv(trX, trY, vaX, vaY, teX=None, teY=None, penalty='l1',
-        C=2**np.arange(-8, 1).astype(np.float), seed=42):
+                      C=2 ** np.arange(-8, 1).astype(np.float), seed=42):
     scores = []
     for i, c in enumerate(C):
-        model = LogisticRegression(C=c, penalty=penalty, random_state=seed+i)
+        model = LogisticRegression(C=c, penalty=penalty, random_state=seed + i)
         model.fit(trX, trY)
         score = model.score(vaX, vaY)
         scores.append(score)
     c = C[np.argmax(scores)]
-    model = LogisticRegression(C=c, penalty=penalty, random_state=seed+len(C))
+    model = LogisticRegression(C=c, penalty=penalty, random_state=seed + len(C))
     model.fit(trX, trY)
     nnotzero = np.sum(model.coef_ != 0)
     if teX is not None and teY is not None:
-        score = model.score(teX, teY)*100.
+        score = model.score(teX, teY) * 100.
     else:
-        score = model.score(vaX, vaY)*100.
+        score = model.score(vaX, vaY) * 100.
     return score, c, nnotzero
 
 
@@ -31,7 +32,7 @@ def load_sst(path):
     return X, Y
 
 
-def sst_binary(data_dir='data/'):
+def sst_binary(data_dir=f'/data/'):
     """
     Most standard models make use of a preprocessed/tokenized/lowercased version
     of Stanford Sentiment Treebank. Our model extracts features from a version
@@ -52,7 +53,7 @@ def find_trainable_variables(key):
 def preprocess(text, front_pad='\n ', end_pad=' '):
     text = html.unescape(text)
     text = text.replace('\n', ' ').strip()
-    text = front_pad+text+end_pad
+    text = front_pad + text + end_pad
     text = text.encode()
     return text
 
